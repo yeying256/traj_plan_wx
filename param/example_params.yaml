@@ -1,0 +1,84 @@
+#机器人几何参，如果机器人是圆形，设置 robot_radius,如果是其他形状设置 footprint
+# robot_radius: 0.12 #圆形
+footprint: [[-0.525, -0.625], [-0.525, 0.625], [0.525, 0.625], [0.525, -0.625]] #其他形状
+
+# obstacle_range: 3.0 # 用于障碍物探测，比如: 值为 3.0，意味着检测到距离小于 3 米的障碍物时，就会引入代价地图
+# raytrace_range: 3.5 # 用于清除障碍物，比如：值为 3.5，意味着清除代价地图中 3.5 米以外的障碍物
+
+static_map: true  #不需要静态地图，可以提升导航效果
+rolling_window: false #默认为false，如果开启的话，地图是时刻跟随机器人中心移动的，这里需要根据机器人当前位置和地图大小计算出地图的新原点，设置给主地图。
+
+
+
+transform_tolerance: 0.2
+
+# always_send_full_costmap: true
+always_send_full_costmap: false
+
+#地图类型
+map_type: costmap
+#导航包所需要的传感器
+# observation_sources: scan
+
+
+
+#对传感器的坐标系和数据进行配置。这个也会用于代价地图添加和清除障碍物。例如，你可以用激光雷达传感器用于在代价地图添加障碍物，再添加kinect用于导航和清除障碍物。
+# scan: {sensor_frame: base_link, data_type: LaserScan, topic: scan, marking: true, clearing: true}
+
+global_frame: map #里程计坐标系
+robot_base_frame: base_footprint #机器人坐标系
+
+update_frequency: 10.0 #代价地图更新频率
+publish_frequency: 10.0 #代价地图的发布频率
+transform_tolerance: 0.5 #等待坐标变换发布信息的超时时间
+
+plugins:
+- {name: static_layer,        type: "costmap_2d::StaticLayer"}
+- {name: obstacle_layer,          type: "costmap_2d::ObstacleLayer"}
+- {name: inflation_layer,         type: "costmap_2d::InflationLayer"}
+# width: 5 # 局部地图宽度 单位是 m
+# height: 5 # 局部地图高度 单位是 m
+# resolution: 0.05 # 局部地图分辨率 单位是 m，一般与静态地图分辨率保持一致
+
+
+inflation_layer:
+  enabled:              true
+  cost_scaling_factor:  5.0  # exponential rate at which the obstacle cost drops off (default: 10)
+  inflation_radius:     1.2  # max. distance from an obstacle at which costs are incurred for planning paths.
+
+static_layer:
+  enabled:              true
+  map_topic:            "/map"
+
+obstacle_layer:
+  enabled: true
+  obstacle_range: 3.0
+  raytrace_range: 4.0
+  inflation_radius: 0.2
+  track_unknown_space: true
+  combination_method: 0 #1 (max)：取较大值 0 (overwrite)：直接覆盖
+#膨胀半径，扩展在碰撞区域以外的代价区域，使得机器人规划路径避开障碍物
+  inflation_radius: 1.2
+  # #代价比例系数，越大则代价值越小
+  # cost_scaling_factor: 1.0
+  cost_scaling_factor: 1.0
+  observation_sources: rplidar_sensor1 rplidar_sensor2
+  rplidar_sensor1: 
+    sensor_frame: laser_1
+    data_type: LaserScan
+    topic: /scan_1
+    marking: true
+    clearing: true
+    inf_is_valid: true
+    max_obstacle_height: 2.0 # 可视化范围内的最大障碍物高度
+    obstacle_range: 5.0 # 雷达的有效感知距离
+  rplidar_sensor2:
+    sensor_frame: laser_2
+    data_type: LaserScan
+    topic: /scan_2
+    marking: true
+    clearing: true
+    max_obstacle_height: 2.0 # 可视化范围内的最大障碍物高度
+    obstacle_range: 5.0 # 雷达的有效感知距离
+
+

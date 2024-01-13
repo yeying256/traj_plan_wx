@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<launch>
+      <!-- Publishes the voxel grid to rviz for display -->
+    <!-- <node pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer">
+        <remap from="voxel_grid" to="costmap/voxel_grid"/>
+    </node> -->
+
+    <!-- Run the costmap node -->
+    <!-- <node name="costmap_node" pkg="costmap_2d" type="costmap_2d_node" >
+        <rosparam file="$(find traj_plan_wx)/param/example_params.yaml" command="load" ns="costmap" />
+    </node> -->
+    <param name="/use_sim_time" value="true"/>
+    <!-- <node pkg="traj_plan_wx" type="test_node" name="test_node">
+      <rosparam file="$(find traj_plan_wx)/param/example_params.yaml" command="load" ns="costmap" />
+    </node> -->
+
+    <!-- 设置地图的配置文件 -->
+    <arg name="map" default="easy_map.yaml" />
+    <!-- 运行地图服务器，并且加载设置的地图-->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find agvsim_navigation)/maps/$(arg map)"/>
+    <!-- 启动AMCL节点 -->
+    <include file="$(find agvsim_navigation)/launch/amcl.launch" />
+
+    <!-- 加载机器人参数 -->
+    <param name="robot_description" textfile="$(find agv_real)/urdf/agv_real.urdf" />
+
+
+
+    <!-- 参数实时修改 -->
+    <node pkg="rqt_reconfigure" type="rqt_reconfigure" name="rqt_reconfigure" />
+
+        <!-- 加载机器人几何参数 -->
+        <rosparam file="$(find agv_sim_roscontrol)/config/agv_geometry_param_new.yaml" command="load"></rosparam>
+
+        <!-- 加载gazebo的控制器配置参数，如gazebo中要驱动的关节类型和pid -->
+        <rosparam file="$(find agv_sim_roscontrol)/config/agv_gazebo_ros_controller_new.yaml" command="load"></rosparam>
+    
+        <!-- 启动控制器， -->
+        <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+        output="screen" ns="/agv_sim" args=" 
+        turn_wheels_controller"/>
+    
+        <!-- 启动gazebo环境 -->
+        <include file="$(find agv_real)/launch/gazebo.launch">
+        </include>
+    
+        <!-- 启动卡尔曼滤波融合 -->
+        <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+          <param name="output_frame" value="odom_com"/>
+          <param name="base_footprint_frame" value="base_footprint"/>
+          <param name="freq" value="1000.0"/>
+          <param name="sensor_timeout" value="1.0"/>  
+          <param name="odom_used" value="true"/>
+          <param name="imu_used" value="true"/>
+          <param name="vo_used" value="false"/>
+          <param name="topic_imu" value="/imu_data"/>
+          <!-- 仿真imu的话题名称 -->
+          
+      </node> 
+    
+      <!-- <node pkg="robot_state_publisher" name="robot_state_publisher" type="robot_state_publisher" /> -->
+    
+    
+    
+        <!-- 打开状态机 -->
+        <node pkg="hfsm" type="hfsm_node" name="hfsm_node" output="screen" />
+    
+          <!-- 打开遥控器节点 -->
+      <include file="$(find joy)/launch/joy.launch" />
+    
+    
+    
+    
+    
+        <!-- ar码识别节点 -->
+        <include file="$(find ar_track_alvar)/launch/steel_wheel_artrack_sim.launch">
+            
+        </include>
+    
+        <!-- ar码相对运动跟踪节点 -->
+        <node pkg="agv_relative_move" type="reltive_move" name="reltive_move" output="screen">
+            
+        </node>
+
+
+</launch>

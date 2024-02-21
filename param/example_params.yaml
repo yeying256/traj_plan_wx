@@ -10,7 +10,7 @@ rolling_window: false #默认为false，如果开启的话，地图是时刻跟�
 
 
 
-transform_tolerance: 0.2
+# transform_tolerance: 0.2
 
 # always_send_full_costmap: true
 always_send_full_costmap: false
@@ -58,7 +58,7 @@ obstacle_layer:
   track_unknown_space: true
   combination_method: 0 #1 (max)：取较大值 0 (overwrite)：直接覆盖
 #膨胀半径，扩展在碰撞区域以外的代价区域，使得机器人规划路径避开障碍物
-  inflation_radius: 1.2
+  # inflation_radius: 1.5
   # #代价比例系数，越大则代价值越小
   # cost_scaling_factor: 1.0
   cost_scaling_factor: 1.0

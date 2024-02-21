@@ -5,7 +5,9 @@
 #include <Eigen/Dense>
 #include <random>
 #include <vector>
+#include <tf/tf.h>
 
+#include "PID_controller.h"
 namespace plan_wx{
     const std::string color_default = "\033[0m";
     const std::string color_red = "\033[31m";
@@ -19,6 +21,8 @@ namespace plan_wx{
         double dx;
         double dy;
         double dyaw;
+        //四元数描述旋转
+        tf2::Quaternion q4;
         // s
         double cost_point;
     };

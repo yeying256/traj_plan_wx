@@ -50,8 +50,16 @@ namespace plan_wx{
             optimize_path(guass_data_);
             
             // 根据不同的策略缩放sigma scale_value是一个比率double型
-            this->evolutionary_strategy(map_.get_min_cost());
+            double scale =  this->evolutionary_strategy(map_.get_min_cost());
+
+            // 打印测试最小的cost
+            // guass_kernelParam_.sigma;
+
             std::cout<<"map_.get_min_cost() = "<<map_.get_min_cost()<<std::endl;
+            std::cout<<"scale = "<<scale<<std::endl;
+            std::cout<<"guass_kernelParam_.sigma = "<<guass_kernelParam_.sigma<<std::endl;
+
+
             
         }
         
@@ -73,7 +81,7 @@ namespace plan_wx{
             // 目标改变标志位
             this->guass_base_param_.goal_change_index = true;
 
-            // 每一行是一个点 8*dof
+            // 每一行是一个点 8*dof 
             this->guass_data_.path_mean_ = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
             if (guass_base_param_.init_meanPath_flag == false)
             {
@@ -84,6 +92,9 @@ namespace plan_wx{
             // 不重新采样
             ;
         }
+
+        // this->guass_data_.path_mean_ = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
+
 
         if(this->guass_base_param_.prior_update_flag == true)
         {
@@ -187,8 +198,8 @@ namespace plan_wx{
     {
         //  取出最优轨迹的index ,并且更新代价 
         int index = map_.cost_cal(data.path_generate_);
-
-        //  
+        
+        //  将最优路径取出来，设置为均值路径
         this->guass_data_.path_mean_ = data.path_generate_[index];
         ;
     }
@@ -197,15 +208,16 @@ namespace plan_wx{
     {
 
         // print("obstacle cost", obs_cost)
+
         double scale = 1.0;
         if (cost<1000 &&  guass_kernelParam_.sigma>guass_kernelParam_.sigma_min)
         {
-            scale = 0.8;
+            scale = 0.5;
             this->guass_kernelParam_.sigma *=scale; 
         }
         else if (cost > 0 && guass_kernelParam_.sigma<guass_kernelParam_.sigma_max)
         {
-            scale = 1.8;
+            scale = 1.2;
             guass_kernelParam_.sigma *= scale;
         }else
         {
@@ -213,7 +225,6 @@ namespace plan_wx{
         }
             this->guass_kernelParam_.sigma_scale *=scale;
             return scale;
-        ;
     }
 
     nav_msgs::Path guass_plan::get_path_mean()
@@ -226,7 +237,6 @@ namespace plan_wx{
         {
             point.pose.position.x = guass_data_.path_mean_(i,0);
             point.pose.position.y = guass_data_.path_mean_(i,1);
-
             path.poses.push_back(point);
         }
         return path;

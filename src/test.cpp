@@ -2,10 +2,12 @@
 #include "traj_plan_wx/guass_plan.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"
+#include "traj_plan_wx/controller.h"
 
 ros::Subscriber sub_amcl_pose;
 Eigen::Vector2d pose_now;
 
+geometry_msgs::Pose pose_now_geometry_msgs;
 
 void poseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg) {
     // 这里你可以访问msg->pose.pose来获取机器人的位置和姿态信息
@@ -14,6 +16,8 @@ void poseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
                 << ", " << tf::getYaw(msg->pose.pose.orientation) << ")");
     pose_now(0) = msg->pose.pose.position.x;
     pose_now(1) = msg->pose.pose.position.y;
+    pose_now_geometry_msgs = msg->pose.pose;
+
 }
 
 
@@ -21,6 +25,10 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test_node");
     ros::NodeHandle n;
+    ros::AsyncSpinner s(2);
+    s.start();
+
+    pose_now_geometry_msgs.orientation.w = 1;
     //     dof = 2                     #自由度
     // delta_t = 0.05              #每一步时间
     // global_num_waypoints = 8    #中间点的数量 
@@ -33,15 +41,44 @@ int main(int argc, char **argv)
     // tf2_ros::Buffer buffer(ros::Duration(10));
     // tf2_ros::TransformListener tf(buffer);
     // costmap_2d::Costmap2DROS* cost_map_api_ = new costmap_2d::Costmap2DROS("costmap", buffer);
-    // sub_amcl_pose = n.subscribe("/amcl_pose", 10, poseCallback);
+    sub_amcl_pose = n.subscribe("/amcl_pose", 10, poseCallback);
+
+
+  // 创建一个publisher，topic名为/cmd_vel，消息类型为geometry_msgs/Twist
+
+    ros::Publisher cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+
+    //监听当前机器人位姿
+    tf2_ros::Buffer tf_buffer;
+    tf2_ros::TransformListener tf_listener(tf_buffer);
+
+    // 获取目标坐标系相对于源坐标系的变换
+    geometry_msgs::TransformStamped transformStamped;
 
     plan_wx::guass_plan plan(2,200,8,1);
+
+    
     Eigen::Vector2d pose_end = {5.48,-4.59};
+    
+    geometry_msgs::Pose pos_d;
+    pos_d.position.x = pose_end(0);
+    pos_d.position.y = pose_end(1);
+    pos_d.orientation.w = 1;
+    pos_d.orientation.x = 0;
+    pos_d.orientation.y = 0;
+    pos_d.orientation.z = 0;
+
+
+    
 
     // sleep(5);
     ros::Publisher path_pub_good= n.advertise<nav_msgs::Path>("path_topic_good", 10);
 
-    for (int i = 0; i < 500; i++)
+    plan_wx::controller cmd;
+
+    geometry_msgs::Twist cmd_vel;
+    
+    for (int i = 0; i < 50000; i++)
     {
         auto start = std::chrono::high_resolution_clock::now();
         plan.global_mpc_planner(pose_now,pose_end,1);
@@ -53,9 +90,32 @@ int main(int argc, char **argv)
         nav_msgs::Path path_mean = plan.get_path_mean();
         path_pub_good.publish(path_mean);
 
+        
+        transformStamped = tf_buffer.lookupTransform(
+            "map",  // 源坐标系
+            "base_footprint",  // 目标坐标系
+            ros::Time(0), // 查询当前时间或指定时间戳的变换
+            ros::Duration(0.001)); // 超时等待时间，这里设置为1秒
+
+            // transformStamped.transform
+            transformStamped.transform.rotation;
+            geometry_msgs::Pose pose_now_tf;
+            pose_now_tf.orientation = transformStamped.transform.rotation;
+            pose_now_tf.position.x = transformStamped.transform.translation.x;
+            pose_now_tf.position.y = transformStamped.transform.translation.y;
+
+        cmd_vel = cmd.line2cmd_vel(path_mean,pos_d,pose_now_tf);
+        // 发布cmd_vel
+        cmd_vel_pub.publish(cmd_vel);
+
+        if (!ros::ok() )
+        {
+            break;
+        }
+        
+
     }
     
-
 
 
 
@@ -79,6 +139,8 @@ int main(int argc, char **argv)
     ;
 
     ros::spin();
+
+    s.stop();
     // delete cost_map_api_;
     
     

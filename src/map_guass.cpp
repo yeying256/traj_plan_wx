@@ -157,12 +157,17 @@ namespace plan_wx{
                 
                 // 计算yaw值
                 double yaw = atan(kl);
+                tf2::Quaternion q4;
+                q4.setRPY(0,0,yaw);
                 for (double x = line[i](j,0); x < line[i](j+1,0); x+=resulote)
                 {
                     Point_robot_state point;
                     point.x = x;    //设置每个点的坐标值
                     point.y = y0 + kl * (x-x0);
+                    // 设置yaw值
                     point.yaw = yaw;
+                    //设置四元数
+                    point.q4 = q4;
                     unsigned int x_map,y_map;   //地图int
                     this->cost_map_->worldToMap(point.x,point.y,x_map,y_map);
 

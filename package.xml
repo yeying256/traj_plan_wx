@@ -59,6 +59,18 @@
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
 
+  <build_depend>robot_dynamic_cal</build_depend>
+  <build_export_depend>robot_dynamic_cal</build_export_depend>
+  <exec_depend>robot_dynamic_cal</exec_depend>
+
+  <build_depend>geometry_msgs</build_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+
+
+  
+  geometry_msgs
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

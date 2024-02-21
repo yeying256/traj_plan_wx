@@ -29,7 +29,7 @@ namespace plan_wx{
         {
             double l=0.05;
             double sigma = 4e-2;
-            double sigma_max = 4e-2;
+            double sigma_max = 4;
             double sigma_min = 1e-3;
             double sigma_scale = 1; 
             /* data */

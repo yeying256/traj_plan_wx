@@ -15,6 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   costmap_2d
   # costmap_2d
+  robot_dynamic_cal
+  geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -129,6 +131,7 @@ add_library(lib_plan_wx
   src/guass_plan.cpp
   src/include_common.cpp
   src/map_guass.cpp
+  src/controller.cpp
 )
 
 ## Add cmake target dependencies of the library

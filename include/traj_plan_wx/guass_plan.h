@@ -19,7 +19,7 @@ namespace plan_wx{
             int global_num_particles;//生成的随机曲线的条数
             int global_num_waypoints;//中间点的数量
             int global_iterations;//迭代次数
-            bool prior_update_flag = false;
+            bool prior_update_flag = false; //先验更新
             bool goal_change_index = false;
             bool init_meanPath_flag = false;
         }guass_base_param_;
@@ -29,7 +29,7 @@ namespace plan_wx{
         {
             double l=0.05;
             double sigma = 4e-2;
-            double sigma_max = 4;
+            double sigma_max = 40;
             double sigma_min = 1e-3;
             double sigma_scale = 1; 
             /* data */
@@ -40,8 +40,10 @@ namespace plan_wx{
             std::vector<Eigen::MatrixXd> path_generate_;
             // 生成的样本点，用来生成轨迹
             std::vector<Eigen::MatrixXd> normal_batch_samples_;
-                    
-            Eigen::MatrixXd path_mean_;// 平均路径
+
+            Eigen::MatrixXd straight_line_;// 直线路径
+            Eigen::MatrixXd path_mean_;// 最优的路径
+            Eigen::MatrixXd good_batch_samples_;//最优的样本点
         }guass_data_;
 
         // 代价地图

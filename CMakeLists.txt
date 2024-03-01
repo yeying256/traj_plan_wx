@@ -19,6 +19,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
 )
 
+# 找到Python和NumPy库
+
+find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 

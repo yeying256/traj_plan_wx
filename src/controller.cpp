@@ -96,7 +96,7 @@ namespace plan_wx{
 
         */
 
-        if (distance_d_e>1.0)
+        if (distance_d_e>0.3)
         {
             target_pos[0] = path.poses[1].pose.position.x;
             target_pos[1] = path.poses[1].pose.position.y;

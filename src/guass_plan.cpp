@@ -23,7 +23,11 @@ namespace plan_wx{
 
         // 平均路径
         guass_data_.path_mean_.resize(global_num_waypoints,dof);
-        this->guass_data_.path_generate_.resize(global_num_particles);
+        // 最优样本点
+        guass_data_.good_batch_samples_.setZero(global_num_waypoints,dof);
+        guass_data_.straight_line_.setZero(global_num_waypoints,dof);
+
+        this->guass_data_.path_generate_.resize(global_num_particles + 1);
 
     }
 
@@ -82,7 +86,7 @@ namespace plan_wx{
             this->guass_base_param_.goal_change_index = true;
 
             // 每一行是一个点 8*dof 
-            this->guass_data_.path_mean_ = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
+            // this->guass_data_.path_mean_ = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
             if (guass_base_param_.init_meanPath_flag == false)
             {
                 guass_base_param_.init_meanPath_flag = true;
@@ -92,7 +96,10 @@ namespace plan_wx{
             // 不重新采样
             ;
         }
-
+        //重新画一条直线
+        Eigen::MatrixXd path_mean = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
+        
+        guass_data_.straight_line_ = path_mean;
         // this->guass_data_.path_mean_ = Tool_wx::linearInterpolation(this->start_pos_,target_pos_,this->guass_base_param_.global_num_waypoints);
 
 
@@ -100,15 +107,24 @@ namespace plan_wx{
         {
             // 生成global_num_particles条轨迹
             guass_data_.normal_batch_samples_ = this->gp_prior_.sample(guass_base_param_.global_num_particles);
-        }else{;} //否则就什么也不做
-        // 生成随机轨迹
+        }else
+        {
+            //这里应该用前一组的高斯数据和新的直线差值重新生成一条轨迹，所以应当选择出来最优轨迹的那组高斯先验分布参数
+            ;
+        } //否则就什么也不做
+
+        // 生成随机轨迹 第一个轨迹是直线，后面的轨迹全是高斯采样生成的
+        this->guass_data_.path_generate_[0] = path_mean;
         for (int i = 0; i < this->guass_base_param_.global_num_particles; i++)
         {
             // 缩放系数* 高斯生成的那个下三角矩阵 * 每条轨迹样本点
-            this->guass_data_.path_generate_[i] = this->guass_data_.path_mean_ 
+            // this->guass_data_.path_generate_[i] = this->guass_data_.path_mean_ 
+            this->guass_data_.path_generate_[i+1] = path_mean
             + this->guass_kernelParam_.sigma_scale 
                 * guass_data_.L_posterior_ 
-                * guass_data_.normal_batch_samples_[i];
+                * guass_data_.normal_batch_samples_[i] 
+            + 0.99 * guass_data_.good_batch_samples_
+            ;
         }
     }
 
@@ -200,7 +216,14 @@ namespace plan_wx{
         int index = map_.cost_cal(data.path_generate_);
         
         //  将最优路径取出来，设置为均值路径
-        this->guass_data_.path_mean_ = data.path_generate_[index];
+        // this->guass_data_.path_mean_ = data.path_generate_[index];
+        // this->guass_data_.good_batch_samples_ = data.path_generate_[index] - data.path_mean_;
+
+        data.path_mean_ = data.path_generate_[index];
+        data.good_batch_samples_ = data.path_generate_[index] - data.straight_line_;
+        // this->guass_data_.good_batch_samples_ = data.normal_batch_samples_[index];
+
+        // std::cout<<"guass_data_.good_batch_samples_ = "<<guass_data_.good_batch_samples_<<std::endl;
         ;
     }
 
@@ -217,7 +240,7 @@ namespace plan_wx{
         }
         else if (cost > 0 && guass_kernelParam_.sigma<guass_kernelParam_.sigma_max)
         {
-            scale = 1.2;
+            scale = 1.8;
             guass_kernelParam_.sigma *= scale;
         }else
         {

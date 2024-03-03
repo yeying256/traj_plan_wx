@@ -3,9 +3,11 @@
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "nav_msgs/Path.h"
 #include "traj_plan_wx/controller.h"
+#include <nav_msgs/Odometry.h>
 
 ros::Subscriber sub_amcl_pose;
 Eigen::Vector2d pose_now;
+Eigen::Vector2d vel_now;
 
 geometry_msgs::Pose pose_now_geometry_msgs;
 
@@ -20,12 +22,52 @@ void poseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
 
 }
 
+void odomCallback(const nav_msgs::Odometry::ConstPtr& odom_msg)
+
+{
+
+    // 解析Odometry消息内容
+
+    geometry_msgs::Pose pose = odom_msg->pose.pose;
+
+    geometry_msgs::Point position = pose.position;
+
+    geometry_msgs::Quaternion orientation = pose.orientation;
+
+
+    geometry_msgs::Twist twist = odom_msg->twist.twist;
+
+    geometry_msgs::Vector3 linear_velocity = twist.linear;
+
+    geometry_msgs::Vector3 angular_velocity = twist.angular;
+    vel_now(0) = twist.linear.x;
+    vel_now(1) = twist.linear.y;
+
+
+
+    // ROS_INFO_STREAM("Received Odom data:");
+
+    // ROS_INFO_STREAM("Position: (" << position.x << ", " << position.y << ", " << position.z << ")");
+
+    // // 注意：将四元数转换为欧拉角或航向角通常更为直观，这里仅作演示未做转换
+
+    // ROS_INFO_STREAM("Orientation: (" << orientation.x << ", " << orientation.y << ", " << orientation.z << ", " << orientation.w << ")");
+
+    // ROS_INFO_STREAM("Linear Velocity: (" << linear_velocity.x << ", " << linear_velocity.y << ", " << linear_velocity.z << ")");
+
+    // ROS_INFO_STREAM("Angular Velocity: (" << angular_velocity.x << ", " << angular_velocity.y << ", " << angular_velocity.z << ")");
+
+
+    // 这里可以进一步处理odom数据，例如记录、绘图、控制等
+
+}
+
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test_node");
     ros::NodeHandle n;
-    ros::AsyncSpinner s(2);
+    ros::AsyncSpinner s(3);
     s.start();
 
     pose_now_geometry_msgs.orientation.w = 1;
@@ -47,6 +89,8 @@ int main(int argc, char **argv)
   // 创建一个publisher，topic名为/cmd_vel，消息类型为geometry_msgs/Twist
 
     ros::Publisher cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+
+    ros::Subscriber odom_sub = n.subscribe<nav_msgs::Odometry>("/odom", 10, odomCallback);
 
     //监听当前机器人位姿
     tf2_ros::Buffer tf_buffer;
@@ -77,6 +121,9 @@ int main(int argc, char **argv)
     plan_wx::controller cmd;
 
     geometry_msgs::Twist cmd_vel;
+
+    ros::Publisher path_pub_all = n.advertise<nav_msgs::Path>("path_topic_all", 10);
+    ros::Publisher path_pub_cubic = n.advertise<nav_msgs::Path>("path_cubic", 10);
     
     for (int i = 0; i < 50000; i++)
     {
@@ -104,7 +151,9 @@ int main(int argc, char **argv)
             pose_now_tf.position.x = transformStamped.transform.translation.x;
             pose_now_tf.position.y = transformStamped.transform.translation.y;
 
-        cmd_vel = cmd.line2cmd_vel(path_mean,pos_d,pose_now_tf);
+        cmd_vel = cmd.line2cmd_vel(path_mean,pos_d,pose_now_tf,vel_now);
+        path_pub_cubic.publish(cmd.path_cubic_);
+        
         // 发布cmd_vel
         cmd_vel_pub.publish(cmd_vel);
 
@@ -116,12 +165,12 @@ int main(int argc, char **argv)
 
     }
     
+    
 
 
 
 
 
-    ros::Publisher path_pub_all = n.advertise<nav_msgs::Path>("path_topic_all", 10);
     std::vector<nav_msgs::Path> plan_all = plan.get_path_all();
 
     ros::Duration time(0.1);

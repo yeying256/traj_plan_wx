@@ -171,7 +171,7 @@ namespace plan_wx{
                     unsigned int x_map,y_map;   //地图int
                     this->cost_map_->worldToMap(point.x,point.y,x_map,y_map);
 
-                    point.cost_point = cost_map_->getCost(x_map,y_map);
+                    point.cost_point = cost_map_->getCost(x_map,y_map)*5;
 
                     point.dx = resulote;
                     point.dy = dy;

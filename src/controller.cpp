@@ -12,6 +12,8 @@ namespace plan_wx{
     controller::controller(/* args */):pid_{{1.0,0.0,0.0,1.0},{1.0,0.0,0.0,1.0},{1.0,0.0,0.0,1.0}}
     {
         geometry_msgs::Twist cmd_vel;
+        path_cubic_.header.frame_id = "/map";
+
         
         ;
     }
@@ -23,17 +25,11 @@ namespace plan_wx{
     }
 
     
-    /**
-     * @brief 
-     * 
-     * @param path 传入的路径 
-     * @param pos_d 最终目标位姿
-     * @param pos_now 当前的位姿 
-     * @return geometry_msgs::Twist cmd_vel 
-     */
+
     geometry_msgs::Twist controller::line2cmd_vel(const nav_msgs::Path& path,
-                                                const geometry_msgs::Pose& pos_d,
-                                                const geometry_msgs::Pose& pos_now)
+                                const geometry_msgs::Pose& pos_d,
+                                const geometry_msgs::Pose& pos_now,
+                                const Eigen::Vector2d& vel)
     {
         // 
         geometry_msgs::Twist cmd_vel;
@@ -41,6 +37,7 @@ namespace plan_wx{
         // 
         Eigen::Vector3d target_pos;
         tf2::Quaternion qd_tmp;
+        
 
         // 初始化当前姿态
         tf2::Quaternion pos_now_tf(pos_now.orientation.x,pos_now.orientation.y,pos_now.orientation.z,pos_now.orientation.w);
@@ -54,61 +51,37 @@ namespace plan_wx{
                             + pow((pos_d.position.y - pos_now.position.y),2));
 
 
-        
-        /*
-        
-        
-        
-        int idenx_target = 20;
-        if (path.poses.size()>idenx_target)
-        {
-            target_pos[0] = path.poses[idenx_target].pose.position.x;
-            target_pos[1] = path.poses[idenx_target].pose.position.y;
-            // qd_tmp.setW(path.poses[idenx_target].pose.orientation.w);
-            // qd_tmp.setX(path.poses[idenx_target].pose.orientation.x);
-            // qd_tmp.setY(path.poses[idenx_target].pose.orientation.y);
-            // qd_tmp.setZ(path.poses[idenx_target].pose.orientation.z);
 
-            qd_tmp.setRPY(0,0,atan(     (target_pos[1] - path.poses[idenx_target-1].pose.position.y) 
-                                    /(target_pos[0] - path.poses[idenx_target-1].pose.position.x) )
-                                    );
+        // if (distance_d_e>0.5)
+        // {
+        //     target_pos[0] = path.poses[1].pose.position.x;
+        //     target_pos[1] = path.poses[1].pose.position.y;
+        //     std::cout<<"distance_d_e>1.0"<<std::endl;
 
-            
-        }else
+        //     // qd_tmp.setRPY(0,0,atan(     ( (path.poses[2].pose.position.y)-target_pos[1])
+        //     // /( (path.poses[2].pose.position.x)- target_pos[0])  ) );
+        // }else
+        // {
+        //     target_pos[0] = pos_d.position.x;
+        //     target_pos[1] = pos_d.position.y;
+        // }
+
+        Eigen::MatrixXd path_eigen;
+        path_eigen.resize(path.poses.size(),2);
+        for (int i = 0; i < path_eigen.rows(); i++)
         {
-            target_pos[0] = (path.poses.end()-1)->pose.position.x;
-            target_pos[1] = (path.poses.end()-1)->pose.position.y;
-            // qd_tmp.setW((path.poses.end()-1)->pose.orientation.w);
-            // qd_tmp.setX((path.poses.end()-1)->pose.orientation.x);
-            // qd_tmp.setY((path.poses.end()-1)->pose.orientation.y);
-            // qd_tmp.setZ((path.poses.end()-1)->pose.orientation.z);
-            
-            if(path.poses.size()<=2)
-            {
-                std::cout<<"出错了"<<std::endl;
-            }else
-            {
-                qd_tmp.setRPY(0,0,atan(     (target_pos[1] - (path.poses.end()-2)->pose.position.y) 
-                    /(target_pos[0] - (path.poses.end()-2)->pose.position.x) )  );
-            }
-            
+            path_eigen(i,0) = path.poses[i].pose.position.x;
+            path_eigen(i,1) = path.poses[i].pose.position.y;
         }
 
-        */
+        Eigen::VectorXd target_2d = cubic_2d_target(path_eigen,0.8,vel,0.8);
+        target_pos[0] = target_2d(0);
+        target_pos[1] = target_2d(1);
 
-        if (distance_d_e>0.3)
-        {
-            target_pos[0] = path.poses[1].pose.position.x;
-            target_pos[1] = path.poses[1].pose.position.y;
-            std::cout<<"distance_d_e>1.0"<<std::endl;
 
-            // qd_tmp.setRPY(0,0,atan(     ( (path.poses[2].pose.position.y)-target_pos[1])
-            // /( (path.poses[2].pose.position.x)- target_pos[0])  ) );
-        }else
-        {
-            target_pos[0] = pos_d.position.x;
-            target_pos[1] = pos_d.position.y;
-        }
+
+
+
         qd_tmp.setValue(pos_d.orientation.x,pos_d.orientation.y,pos_d.orientation.z,pos_d.orientation.w);
 
 
@@ -153,6 +126,60 @@ namespace plan_wx{
         // std::cout<< "cmd_vel x = "<< cmd_vel.linear.x<<"cmd_vel y ="<<cmd_vel.linear.y<<"cmd_vel wz = "<<cmd_vel.angular.z<<std::endl;
         return cmd_vel;
 
+    }
+
+    Eigen::VectorXd controller::cubic_2d_target(Eigen::MatrixXd traj,
+                                    double mean_vel,
+                                    Eigen::Vector2d vel_now,
+                                    double target_time)
+    {
+        Eigen::VectorXd h;
+        h.resize(traj.rows()-1);
+        // 累计计算距离
+        for (int i = 0; i < traj.rows()-1; i++)
+        {
+            h(i) = sqrt( pow(traj(i+1,0)-traj(i,0),2) 
+                    + pow(traj(i+1,1)-traj(i,1),2) ) / mean_vel;
+        }
+        double time_all;
+        for (int i = 0; i < h.size(); i++)
+        {
+            time_all+=h(i);
+        }
+        
+
+        Eigen::Matrix2d bound;
+        bound.col(0) = vel_now;
+        bound.col(1).setZero();
+
+        
+
+        xj_dy_ns::Cubic_Spline cubic;
+        cubic.init(traj,h,xj_dy_ns::Cubic_Spline::VELOCITY,bound);
+
+        Eigen::VectorXd target;
+        if (target_time < time_all)
+        {
+            target = cubic.cal(target_time);
+        }
+        else
+        {
+            target = traj.bottomRows(1).transpose();
+        }
+        path_cubic_.poses.clear();
+        int pointnum = 200;
+        double delta_t_path = time_all/pointnum;
+        for (int i = 0; i < pointnum; i++)
+        {
+            Eigen::Vector2d xy = cubic.cal(i*delta_t_path);
+            geometry_msgs::PoseStamped tmp2;
+            tmp2.pose.position.x = xy(0);
+            tmp2.pose.position.y = xy(1);
+            path_cubic_.poses.push_back(tmp2);
+        }
+        
+        
+        return target;
     }
 
 

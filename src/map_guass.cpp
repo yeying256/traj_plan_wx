@@ -143,53 +143,122 @@ namespace plan_wx{
         {
             traj_all.resize(line.size());
         }
-        
         for (int i = 0; i < line.size(); i++)//遍历每一条生成的线
         {
+            bool flag_out_ = false;
             struct traj_str traj_only;  //每一条曲线的信息
+            traj_only.cost_all = 0.0;
             for (int j = 0; j < line[i].rows() - 1; j++) //遍历每一个点 减去1是因为最后一个点
             {
+                double distance = sqrt(
+                                        pow(line[i](j+1,0) - line[i](j,0),2)
+                                        +pow(line[i](j+1,1) - line[i](j,1),2)
+                                        );
+                if (distance>10.0)
+                {
+                    flag_out_ = true;
+                    break;
+                }
+                
+                // flag_out_ == true;
                 // 求 每两点之间的斜率
-                double kl = (line[i](j+1,1)-line[i](j,1) ) / (line[i](j+1,0)-line[i](j,0));
-                double dy = kl*resulote;    //计算dy
+                // double kl = (line[i](j+1,1)-line[i](j,1) ) / (line[i](j+1,0)-line[i](j,0));
+                // double dy = kl*resulote;    //计算dy
                 double x0 = line[i](j,0);   //
                 double y0 = line[i](j,1);   //
                 
                 // 计算yaw值
-                double yaw = atan(kl);
-                tf2::Quaternion q4;
-                q4.setRPY(0,0,yaw);
-                for (double x = line[i](j,0); x < line[i](j+1,0); x+=resulote)
+                // double yaw = atan(kl);
+                // tf2::Quaternion q4;
+                // q4.setRPY(0,0,yaw);
+
+                double x = line[i](j,0);
+                double y = line[i](j,1);
+                // 计算加的次数
+                int count_x = abs(line[i](j+1,0) - line[i](j,0))/resulote -1;
+                int count_y = abs(line[i](j+1,1) - line[i](j,1))/resulote -1;
+
+                int count = 0;
+                count = count_x>=count_y ?   count_x: count_y;
+                // std::cout<<"count = "<<count<<std::endl;
+
+                    double dx_1 = 0;
+                    double dy_1 = 0;
+                if (count>0)
                 {
-                    Point_robot_state point;
-                    point.x = x;    //设置每个点的坐标值
-                    point.y = y0 + kl * (x-x0);
-                    // 设置yaw值
-                    point.yaw = yaw;
-                    //设置四元数
-                    point.q4 = q4;
-                    unsigned int x_map,y_map;   //地图int
-                    this->cost_map_->worldToMap(point.x,point.y,x_map,y_map);
-
-                    point.cost_point = cost_map_->getCost(x_map,y_map)*5;
-
-                    point.dx = resulote;
-                    point.dy = dy;
-
-                    // 载入point
-                    traj_only.point_stamp.push_back(point);
-                }
-
-                traj_only.cost_all = 0;
-                traj_only.size = traj_only.point_stamp.size();
-                for (int i = 0; i < traj_only.point_stamp.size(); i++)
-                {
-                    traj_only.cost_all += traj_only.point_stamp[i].cost_point;
+                    dx_1 = (line[i](j+1,0) - line[i](j,0))/(double)count;
+                    dy_1 = (line[i](j+1,1) - line[i](j,1))/(double)count;
                 }
                 
+
+
+                
+
+                for (int k = 0; k < count; k++)
+                {
+                    Point_robot_state point;
+                    point.x = x0 + dx_1*k;    //设置每个点的坐标值
+                    // point.y = y0 + kl * (x-x0);
+                    point.y = y0 + dy_1*k;
+
+                    
+                    // 设置yaw值
+                    // point.yaw = yaw;
+                    //设置四元数
+                    // point.q4 = q4;
+                    unsigned int x_map,y_map;   //地图int
+
+                    this->cost_map_->worldToMap(point.x,point.y,x_map,y_map);
+
+                    int x_max_map = cost_map_->getSizeInCellsX();
+                    int y_max_map = cost_map_->getSizeInCellsY();
+                    x_map = x_map>x_max_map?x_max_map : x_map;
+                    y_map = y_map>y_max_map?y_max_map : y_map;
+
+                    // std::cout<<"x_map = "<<x_map<<"cost_map_->getSizeInCellsX =" <<cost_map_->getSizeInCellsX()<<std::endl;
+                    // std::cout<<"y_map="<<y_map<<"cost_map_->getSizeInCellsY =" <<cost_map_->getSizeInCellsY()<<std::endl;
+                    if (x_map>x_max_map || y_map>y_max_map)
+                    {
+                        flag_out_ = true;
+                        break;
+                    }
+                    else
+                    {
+                        point.cost_point = (double)cost_map_->getCost(x_map,y_map);
+                        traj_only.cost_all+=point.cost_point;
+
+                    }
+                    
+
+
+                    // if (cost_map_->getCost(x_map,y_map) == 254)
+                    // {
+                    // std::cout<<"cost_map_->getCost(x_map,y_map) = "<<(int)cost_map_->getCost(x_map,y_map)<<std::endl;
+                    // std::cout<<"point.cost_point = "<<point.cost_point<<std::endl;
+                    // }
+
+
+                    point.dx = dx_1;
+                    point.dy = dy_1;
+
+
+
+                    // 长度权重
+                    
+
+                }
+                traj_only.cost_all +=distance;
+
+                
             }
+            if (flag_out_ == true)
+            {
+                traj_only.cost_all=10000000;
+                break;
+            }
+            
             // 轨迹长度代价
-            traj_only.cost_all+=traj_only.point_stamp.size()*2.0;
+            // traj_only.cost_all+=traj_only.point_stamp.size()*0.1;
         
             // 赋值
             traj_all[i] = traj_only;
@@ -200,6 +269,12 @@ namespace plan_wx{
         }
         //将最小代价赋值并返回索引
         min_cost_ = traj_all[min_cost_index].cost_all;
+        // for (size_t i = 0; i < traj_all.size(); i++)
+        // {
+        //     std::cout<<"cost_traj"<<i<<" = "<< traj_all[i].cost_all<<std::endl;
+        // }
+        // std::cout<<"min_cost_ "<<min_cost_index<<"="<<traj_all[min_cost_index].cost_all<<std::endl;
+        
         return min_cost_index;
         
     }

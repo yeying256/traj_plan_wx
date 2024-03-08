@@ -31,6 +31,48 @@ namespace plan_wx{
 
     }
 
+    void guass_plan::init_param_ros(ros::NodeHandle &nh)
+    {
+        this->nh_ = nh;
+
+        if(!nh.getParam("/guass_plan_wx/guass/l",this->guass_kernelParam_.l))
+        {
+            guass_kernelParam_.l = 0.05;
+        }
+        if(!nh.getParam("/guass_plan_wx/guass/sigma",this->guass_kernelParam_.sigma))
+        {
+            guass_kernelParam_.sigma = 0.5;
+        }
+        if(!nh.getParam("/guass_plan_wx/guass/sigma_max",this->guass_kernelParam_.sigma_max))
+        {
+            guass_kernelParam_.sigma_max = 5.0;
+        }
+        if(!nh.getParam("/guass_plan_wx/guass/sigma_min",this->guass_kernelParam_.sigma_min))
+        {
+            guass_kernelParam_.sigma_min = 0.2;
+        }
+        if(!nh.getParam("/guass_plan_wx/guass/sigma_init",this->guass_kernelParam_.sigma_init))
+        {
+            guass_kernelParam_.sigma_init = 0.8;
+        }
+
+        if(!nh.getParam("/guass_plan_wx/guass/scale_up",this->guass_base_param_.scale_up))
+        {
+            guass_base_param_.scale_up = 1.1;
+        }
+        if(!nh.getParam("/guass_plan_wx/guass/scale_down",this->guass_base_param_.scale_down))
+        {
+            guass_base_param_.scale_down = 0.9;
+        }
+
+        if(!nh.getParam("/guass_plan_wx/guass/cost_limit",this->guass_base_param_.cost_limit))
+        {
+            guass_base_param_.cost_limit = 1000.0;
+        }
+
+    }
+
+
     std::vector<Eigen::VectorXd> guass_plan::global_mpc_planner(Eigen::VectorXd start,
     Eigen::VectorXd end,
     int iterations)
@@ -59,9 +101,10 @@ namespace plan_wx{
             // 打印测试最小的cost
             // guass_kernelParam_.sigma;
 
-            std::cout<<"map_.get_min_cost() = "<<map_.get_min_cost()<<std::endl;
-            std::cout<<"scale = "<<scale<<std::endl;
-            std::cout<<"guass_kernelParam_.sigma = "<<guass_kernelParam_.sigma<<std::endl;
+            // std::cout<<"map_.get_min_cost() = "<<map_.get_min_cost()<<std::endl;
+
+            // std::cout<<"scale = "<<scale<<std::endl;
+            // std::cout<<"guass_kernelParam_.sigma = "<<guass_kernelParam_.sigma<<std::endl;
 
 
             
@@ -80,6 +123,7 @@ namespace plan_wx{
         // 如果目标改变或者还没初始化平均路径
         if (distance >0.01 || this->guass_base_param_.init_meanPath_flag == false)
         {
+            this->guass_kernelParam_.sigma = guass_kernelParam_.sigma_init;
             // 进行高斯先验分布
             global_gp_prior();
             // 目标改变标志位
@@ -120,10 +164,12 @@ namespace plan_wx{
             // 缩放系数* 高斯生成的那个下三角矩阵 * 每条轨迹样本点
             // this->guass_data_.path_generate_[i] = this->guass_data_.path_mean_ 
             this->guass_data_.path_generate_[i+1] = path_mean
-            + this->guass_kernelParam_.sigma_scale 
+
+            + this->guass_kernelParam_.sigma 
                 * guass_data_.L_posterior_ 
                 * guass_data_.normal_batch_samples_[i] 
-            + 0.99 * guass_data_.good_batch_samples_
+
+            + 1.0 * guass_data_.good_batch_samples_
             ;
         }
     }
@@ -135,11 +181,11 @@ namespace plan_wx{
         
         // 创建高斯求解协方差矩阵 01 和01 的协方差矩阵
         Eigen::MatrixXd kernel_support = RBF_kernel(t_support,t_support);
-        std::cout<<"kernel_support = "<<kernel_support<<std::endl;
+        // std::cout<<"kernel_support = "<<kernel_support<<std::endl;
         // LLT分解，用于求解线性方程组 2x2
         Eigen::LLT<Eigen::MatrixXd> scale_L(kernel_support + 1e-10 * Eigen::Matrix2d::Identity());
         Eigen::MatrixXd L = scale_L.matrixL();
-        std::cout<<"scale_L = "<<L<<std::endl;
+        // std::cout<<"scale_L = "<<L<<std::endl;
 
         //
         Eigen::VectorXd t_test = Tool_wx::linearInterpolation(0.0,1.0,
@@ -149,20 +195,20 @@ namespace plan_wx{
 
         // 2x8
         k_support_test = RBF_kernel(t_support,t_test);
-        std::cout<<"k_support_test = "<<k_support_test<<std::endl;
+        // std::cout<<"k_support_test = "<<k_support_test<<std::endl;
 
         // compute the variance at our test points. 8x8
         // Eigen::MatrixXd kernel_test = RBF_kernel(t_test,t_test);
 
         // 2X8
         Eigen::MatrixXd scale_Lk= scale_L.matrixL().solve(k_support_test);
-        std::cout<<"scale_Lk = "<<scale_Lk<<std::endl;
+        // std::cout<<"scale_Lk = "<<scale_Lk<<std::endl;
 
         
         // 8x8 t_test的高斯核
         Eigen::MatrixXd kernel_test = RBF_kernel(t_test,t_test);
-        std::cout<<"kernel_test = "<<kernel_test<<std::endl;
-        std::cout<<"guass_base_param_.global_num_waypoints = "<<guass_base_param_.global_num_waypoints<<std::endl;
+        // std::cout<<"kernel_test = "<<kernel_test<<std::endl;
+        // std::cout<<"guass_base_param_.global_num_waypoints = "<<guass_base_param_.global_num_waypoints<<std::endl;
         //  draw samples from the posterior at our test points.
         //  分解矩阵正定矩阵A分解为两个三角矩阵的乘积 posterior：在观测到数据之后对某个参数或模型的概率分布 
         // L_posterior = torch.linalg.cholesky(kernel_test + 1e-6*torch.eye(self.num_test_points) - torch.matmul(scale_Lk.transpose(0, 1), scale_Lk))
@@ -213,7 +259,10 @@ namespace plan_wx{
     void guass_plan::optimize_path(struct Guass_data &data)
     {
         //  取出最优轨迹的index ,并且更新代价 
+        
         int index = map_.cost_cal(data.path_generate_);
+
+
         
         //  将最优路径取出来，设置为均值路径
         // this->guass_data_.path_mean_ = data.path_generate_[index];
@@ -227,26 +276,37 @@ namespace plan_wx{
         ;
     }
 
+    void guass_plan::updata_opt_path(Eigen::MatrixXd const &path)
+    {
+        guass_data_.good_batch_samples_ = path - guass_data_.straight_line_;
+    }
+
+
     double guass_plan::evolutionary_strategy(double cost)
     {
 
         // print("obstacle cost", obs_cost)
 
         double scale = 1.0;
-        if (cost<1000 &&  guass_kernelParam_.sigma>guass_kernelParam_.sigma_min)
+        if (cost<guass_base_param_.cost_limit )
         {
-            scale = 0.5;
-            this->guass_kernelParam_.sigma *=scale; 
+            this->guass_kernelParam_.sigma *=guass_base_param_.scale_down; 
         }
-        else if (cost > 0 && guass_kernelParam_.sigma<guass_kernelParam_.sigma_max)
+        else if (cost > 0 )
         {
-            scale = 1.8;
-            guass_kernelParam_.sigma *= scale;
+            guass_kernelParam_.sigma *= guass_base_param_.scale_up;
         }else
         {
             scale = 1.0;
         }
-            this->guass_kernelParam_.sigma_scale *=scale;
+        guass_kernelParam_.sigma = guass_kernelParam_.sigma<guass_kernelParam_.sigma_min ? guass_kernelParam_.sigma_min : guass_kernelParam_.sigma;
+        guass_kernelParam_.sigma = guass_kernelParam_.sigma>guass_kernelParam_.sigma_max ? guass_kernelParam_.sigma_max : guass_kernelParam_.sigma;
+        
+            // this->guass_kernelParam_.sigma_scale *=scale;
+            std::cout<<"scale = "<<scale<<std::endl;
+            std::cout<<"guass_kernelParam_.sigma= "<<guass_kernelParam_.sigma<<std::endl;
+
+
             return scale;
     }
 

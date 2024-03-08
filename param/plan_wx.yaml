@@ -1,0 +1,32 @@
+guass_plan_wx:
+  topic:
+    cmd_vel: "/cmd_vel"
+    odom: "/odom"
+  plan:
+    # 自由度数，单指生成轨迹
+    dof: 2
+    # 轨迹数量
+    global_num_particles: 200
+    # 规划时生成轨迹的点数 
+    global_num_waypoints: 16
+    #迭代次数
+    global_iterations: 2
+
+    rate: 50
+#  guass_plan(int dof,int global_num_particles,int global_num_waypoints, int global_iterations);
+  frame:
+    robot: "base_footprint"
+    map: "map"
+
+  guass:
+    l: 0.05
+    sigma: 0.5
+    sigma_max: 4.0
+    sigma_min: 0.12
+    sigma_init: 0.8
+
+    scale_up: 1.1
+    scale_down: 0.5
+    cost_limit: 1000.0
+
+

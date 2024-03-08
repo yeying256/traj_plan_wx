@@ -29,7 +29,8 @@ namespace plan_wx{
     geometry_msgs::Twist controller::line2cmd_vel(const nav_msgs::Path& path,
                                 const geometry_msgs::Pose& pos_d,
                                 const geometry_msgs::Pose& pos_now,
-                                const Eigen::Vector2d& vel)
+                                const Eigen::Vector2d& vel,
+                                const double cost)
     {
         // 
         geometry_msgs::Twist cmd_vel;
@@ -42,8 +43,8 @@ namespace plan_wx{
         // 初始化当前姿态
         tf2::Quaternion pos_now_tf(pos_now.orientation.x,pos_now.orientation.y,pos_now.orientation.z,pos_now.orientation.w);
 
-        std::cout<<"pos_now  = "<<pos_now.position<<std::endl;
-        std::cout<<"pos_d  = "<<pos_d.position<<std::endl;
+        // std::cout<<"pos_now  = "<<pos_now.position<<std::endl;
+        // std::cout<<"pos_d  = "<<pos_d.position<<std::endl;
 
 
         // 计算距离
@@ -118,10 +119,23 @@ namespace plan_wx{
         //将世界坐标系下的误差描述转换为机器人坐标系下
         err_trans = T_w2r.inverse() * err_trans;
 
+        // 赋值给成员变量
+        err_[0] = err_trans[0];
+        err_[1] = err_trans[1];
+        err_[2] = yaw_err;
+
+
+
 
         cmd_vel.linear.x = pid_[0].PID(err_trans[0]);
         cmd_vel.linear.y =pid_[1].PID(err_trans[1]);
         cmd_vel.angular.z = pid_[2].PID(yaw_err);
+        if(cost>2000.0)
+        {
+            cmd_vel.linear.x =0.0;
+            cmd_vel.linear.y =0.0;
+            cmd_vel.angular.z = 0.0;
+        }
         
         // std::cout<< "cmd_vel x = "<< cmd_vel.linear.x<<"cmd_vel y ="<<cmd_vel.linear.y<<"cmd_vel wz = "<<cmd_vel.angular.z<<std::endl;
         return cmd_vel;
@@ -135,6 +149,8 @@ namespace plan_wx{
     {
         Eigen::VectorXd h;
         h.resize(traj.rows()-1);
+        int time_num = h.size();
+
         // 累计计算距离
         for (int i = 0; i < traj.rows()-1; i++)
         {
@@ -154,24 +170,42 @@ namespace plan_wx{
 
         
 
-        xj_dy_ns::Cubic_Spline cubic;
-        cubic.init(traj,h,xj_dy_ns::Cubic_Spline::VELOCITY,bound);
+        cubic_.init(traj,h,xj_dy_ns::Cubic_Spline::VELOCITY,bound);
+        // 之前是根据生成的点确定每一段的时间，现在需要对生成的坐标点进行重新排布
+        Eigen::MatrixXd path_updata;
+        Eigen::VectorXd time_mean;
+        // 平均每一段的时间
+        double time_all_mean = time_all/time_num;
+        time_mean.resize(traj.rows());
+        for (int i = 0; i < time_mean.size(); i++)
+        {
+            time_mean(i) = i*time_all_mean;
+        }
+        // std::cout<<"time_mean = "<<time_mean<<std::endl;
+        // 以下使用样条插值重新生成了样本点
+        new_path_point_ = cubic_.cal(time_mean);
+        // std::cout<<"new_path_point_ = "<<new_path_point_<<std::endl;
+        
+
 
         Eigen::VectorXd target;
         if (target_time < time_all)
         {
-            target = cubic.cal(target_time);
+            target = cubic_.cal(target_time);
         }
         else
         {
             target = traj.bottomRows(1).transpose();
         }
+
+        // 清理用于显示的轨迹
         path_cubic_.poses.clear();
+        // 以下是用于可视化轨迹
         int pointnum = 200;
         double delta_t_path = time_all/pointnum;
         for (int i = 0; i < pointnum; i++)
         {
-            Eigen::Vector2d xy = cubic.cal(i*delta_t_path);
+            Eigen::Vector2d xy = cubic_.cal(i*delta_t_path);
             geometry_msgs::PoseStamped tmp2;
             tmp2.pose.position.x = xy(0);
             tmp2.pose.position.y = xy(1);
@@ -181,6 +215,30 @@ namespace plan_wx{
         
         return target;
     }
+
+    Eigen::MatrixXd controller::get_new_point()
+    {
+        return this->new_path_point_;
+    }
+
+
+    Eigen::Vector3d controller::get_err_now()
+    {
+        return err_;
+    }
+
+    bool controller::if_get_target()
+    {
+        // 1弧度 = 57.3度
+        if (abs(err_[0])<0.005 && abs(err_[1])<0.005 && abs(err_[2])<0.004)
+        {
+            return true;
+        }else
+        {
+            return false;
+        }
+    }
+
 
 
 

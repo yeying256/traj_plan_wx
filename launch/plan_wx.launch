@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+
+    <rosparam file="$(find traj_plan_wx)/param/plan_wx.yaml" command="load"/>
+    <node pkg="traj_plan_wx" type="plan_main" name="plan_main" output="screen">
+        <rosparam file="$(find traj_plan_wx)/param/example_params.yaml" command="load" ns="costmap"  />
+    </node>
+</launch>

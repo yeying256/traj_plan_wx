@@ -26,10 +26,15 @@ namespace plan_wx{
     {
     private:
         xj_dy_ns::PID_controller pid_[3];
+
+        // 根据样条曲线重新生成的样本点
+        Eigen::MatrixXd new_path_point_;
+        Eigen::Vector3d err_;
     public:
         controller(/* args */);
         ~controller();
         nav_msgs::Path path_cubic_;
+
         /**
          * @brief 
          * 
@@ -37,12 +42,14 @@ namespace plan_wx{
          * @param pos_d 最终目标位姿
          * @param pos_now 当前的位姿 
          * @param vel 当前速度
+         * @param cost 这条轨迹的权重,当权重过大时要停止运行机器人
          * @return geometry_msgs::Twist cmd_vel 
          */
         geometry_msgs::Twist line2cmd_vel(const nav_msgs::Path& path,
         const geometry_msgs::Pose& pos_d,
         const geometry_msgs::Pose& pos_now,
-        const Eigen::Vector2d& vel);
+        const Eigen::Vector2d& vel,
+        const double cost);
 
         /**
          * @brief 将二维的机器人在世界坐标系下的控制指令描述出来
@@ -57,6 +64,31 @@ namespace plan_wx{
                                     double mean_vel,
                                     Eigen::Vector2d vel_now,
                                     double target_time);
+        
+        xj_dy_ns::Cubic_Spline cubic_;
+
+        /**
+         * @brief Get the new point object
+         * 
+         * @return Eigen::MatrixXd 
+         */
+        Eigen::MatrixXd get_new_point();
+
+        /**
+         * @brief 获取当前的误差向量
+         * 
+         * @return Eigen::Vector3d 
+         */
+        Eigen::Vector3d get_err_now();
+
+        /**
+         * @brief 查询是否达到了目标
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool if_get_target();
+
         
     };
     

@@ -19,6 +19,10 @@ namespace plan_wx{
             int global_num_particles;//生成的随机曲线的条数
             int global_num_waypoints;//中间点的数量
             int global_iterations;//迭代次数
+            double scale_up;
+            double scale_down;
+            double cost_limit;
+
             bool prior_update_flag = false; //先验更新
             bool goal_change_index = false;
             bool init_meanPath_flag = false;
@@ -28,10 +32,11 @@ namespace plan_wx{
         struct KernelParam
         {
             double l=0.05;
-            double sigma = 4e-2;
-            double sigma_max = 40;
-            double sigma_min = 1e-3;
-            double sigma_scale = 1; 
+            double sigma = 0.5;
+            double sigma_max = 5.0;
+            double sigma_min = 0.2;
+            double sigma_init = 0.8;
+            double sigma_scale = 1;
             /* data */
         }guass_kernelParam_;
         
@@ -46,8 +51,7 @@ namespace plan_wx{
             Eigen::MatrixXd good_batch_samples_;//最优的样本点
         }guass_data_;
 
-        // 代价地图
-        MapGuass map_;
+        // MapGuass map_;
 
         // 先验高斯过程
         Multi_val_dist gp_prior_;
@@ -60,8 +64,13 @@ namespace plan_wx{
         std::vector<Eigen::MatrixXd> global_mean_path_all_list_;    //均值路径
         std::vector<Eigen::MatrixXd> global_sample_all_list_;   //中间点
         double dt_;//控制间隔时间？
+
+        // ros句柄，用来传入yaml参数
+        ros::NodeHandle nh_;
         
     public:
+        // 代价地图
+        MapGuass map_;
         
         guass_plan(/* args */);
         /**
@@ -69,7 +78,7 @@ namespace plan_wx{
          * 
          * @param dof 自由度数目
          * @param global_num_particles 粒子数，进行高斯过程采样点的数量 
-         * @param global_num_waypoints 采样时将一整条线段分成多少段
+         * @param global_num_waypoints 采样时将一整条线段分成多少个点，包括初始和结束
          * @param global_iterations 迭代次数
          */
         guass_plan(int dof,int global_num_particles,int global_num_waypoints, int global_iterations);
@@ -122,6 +131,13 @@ namespace plan_wx{
         void optimize_path(struct Guass_data &data);
 
         /**
+         * @brief 手动更新最优轨迹
+         * 
+         * @param path 
+         */
+        void updata_opt_path(Eigen::MatrixXd const &path);
+
+        /**
          * @brief 更新guass_kernelParam_.sigma 和 guass_kernelParam_.sigma_scale,分别用于高斯核生成和高斯过程生成。
          * 
          * @param cost 
@@ -142,6 +158,13 @@ namespace plan_wx{
          * @return std::vector< nav_msgs::Path> 所有的曲线 
          */
         std::vector< nav_msgs::Path> get_path_all();
+
+        /**
+         * @brief 使用yaml文件初始化参数
+         * 
+         * @param nh ros句柄
+         */
+        void init_param_ros(ros::NodeHandle &nh);
 
         
 

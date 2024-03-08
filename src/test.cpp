@@ -13,9 +13,9 @@ geometry_msgs::Pose pose_now_geometry_msgs;
 
 void poseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg) {
     // 这里你可以访问msg->pose.pose来获取机器人的位置和姿态信息
-    ROS_INFO_STREAM("Current robot position: (" << msg->pose.pose.position.x 
-                << ", " << msg->pose.pose.position.y 
-                << ", " << tf::getYaw(msg->pose.pose.orientation) << ")");
+    // ROS_INFO_STREAM("Current robot position: (" << msg->pose.pose.position.x 
+    //             << ", " << msg->pose.pose.position.y 
+    //             << ", " << tf::getYaw(msg->pose.pose.orientation) << ")");
     pose_now(0) = msg->pose.pose.position.x;
     pose_now(1) = msg->pose.pose.position.y;
     pose_now_geometry_msgs = msg->pose.pose;
@@ -99,10 +99,10 @@ int main(int argc, char **argv)
     // 获取目标坐标系相对于源坐标系的变换
     geometry_msgs::TransformStamped transformStamped;
 
-    plan_wx::guass_plan plan(2,200,8,1);
+    plan_wx::guass_plan plan(2,300,12,1);
 
     
-    Eigen::Vector2d pose_end = {5.48,-4.59};
+    Eigen::Vector2d pose_end = {5.35,-3.4};
     
     geometry_msgs::Pose pos_d;
     pos_d.position.x = pose_end(0);
@@ -151,8 +151,14 @@ int main(int argc, char **argv)
             pose_now_tf.position.x = transformStamped.transform.translation.x;
             pose_now_tf.position.y = transformStamped.transform.translation.y;
 
-        cmd_vel = cmd.line2cmd_vel(path_mean,pos_d,pose_now_tf,vel_now);
+        cmd_vel = cmd.line2cmd_vel(path_mean,pos_d,pose_now_tf,vel_now,plan.map_.get_min_cost());
         path_pub_cubic.publish(cmd.path_cubic_);
+
+        // 获取控制优化后的新点
+        Eigen::MatrixXd new_point_cubic = cmd.get_new_point();
+        // std::cout<<"new_point_cubic = "<<new_point_cubic<<std::endl;
+
+        plan.updata_opt_path(new_point_cubic);
         
         // 发布cmd_vel
         cmd_vel_pub.publish(cmd_vel);

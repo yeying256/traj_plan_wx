@@ -136,6 +136,7 @@ add_library(lib_plan_wx
   src/include_common.cpp
   src/map_guass.cpp
   src/controller.cpp
+  src/plan.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -166,6 +167,13 @@ add_library(lib_plan_wx
 add_executable(test_node src/test.cpp)
 add_dependencies(test_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(test_node
+  lib_plan_wx
+  ${catkin_LIBRARIES}
+)
+
+add_executable(plan_main src/main.cpp)
+add_dependencies(plan_main ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(plan_main
   lib_plan_wx
   ${catkin_LIBRARIES}
 )
